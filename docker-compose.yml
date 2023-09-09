@@ -1,0 +1,73 @@
+version: '3'
+services:
+
+  # ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+  postgres:
+  #We have checked on Docker app + postgres config what is the latest
+    image: 'postgres:latest'
+    environment:
+      - POSTGRES_PASSWORD=postgres_password
+  # ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+  redis:
+  #We have checked on Docker app + redis config what is the latest
+    image: 'redis:latest'
+
+  # ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+  nginx:
+    depends_on:
+      - api
+      - client
+    restart: always
+    build:
+      dockerfile: Dockerfile.dev
+      context: ./nginx
+    ports:
+      - '3050:80'
+  # ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+  api:
+    build:
+    #Giving instructions of where the dockerfile is located
+      dockerfile: Dockerfile.dev
+      context: ./server
+    volumes:
+    #by specifying this the following folder will not be touched.
+      - /app/node_modules
+      #Every time our applications have access to the folder will be redirected to this path
+      - ./server:/app
+    environment:
+    #According to the redis documentation, in order to have a redis instance
+    #we have to communicate with 6379 port
+
+    #We check what the variables on POSTGRES are on the documentation:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PGUSER=postgres
+      - PGHOST=postgres
+      - PGDATABASE=postgres
+      - PGPASSWORD=postgres_password
+      - PGPORT=5432
+
+  # ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+      #Adding Client & Worker as a services too:
+  client:
+    environment:
+      - WDS_SOCKET_PORT=0
+    build:
+      dockerfile: Dockerfile.dev
+      context: ./client
+    volumes:
+      - /home/node/app/node_modules
+      #Everything inside client directory should be shared with app folder, inside the container
+      - ./client:/home/node/app
+  worker:
+    build:
+      dockerfile: Dockerfile.dev
+      context: ./worker
+    volumes:
+      - /app/node_modules
+      #Everything inside worker directory should be shared with app folder, inside the container
+      - ./worker:/app
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+  # ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
